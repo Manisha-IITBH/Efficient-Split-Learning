@@ -163,6 +163,13 @@ def parse_arguments():
         help="USE SERVER ONLY FOR OFFLOADING, CURRENTLY ONLY IMPLEMENTED FOR IXI-TINY & KITS19",
     )
 
+    # NewCode: Argument for using supervised contrastive loss
+    parser.add_argument(
+        "--use_contrastive",
+        action="store_true",
+        default=False,
+        help="To use contrastive models",
+    )
 
     args = parser.parse_args()
     return args

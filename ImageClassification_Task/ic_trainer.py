@@ -969,7 +969,13 @@ class ICTrainer:
         self.args = args
         self.log_wandb = self.args.wandb
 
-        self.import_module = f"ImageClassification_Task.models.{self.args.model}_split{self.args.split}"
+        # self.import_module = f"ImageClassification_Task.models.{self.args.model}_split{self.args.split}" #PreviousCode
+        
+        #NewCode: Import module changed for importing contrastive loss model if contrastiveloss is needed
+        if self.args.use_contrastive:
+            self.import_module = f"ImageClassification_Task.models.{self.args.model}_split{self.args.split}_contrastive"
+        else:
+            self.import_module = f"ImageClassification_Task.models.{self.args.model}_split{self.args.split}"
 
         self.pooling_mode = self.args.pool
 
