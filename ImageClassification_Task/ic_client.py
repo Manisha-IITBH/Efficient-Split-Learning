@@ -1,6 +1,5 @@
 import os
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import multiprocessing
 from threading import Thread
@@ -12,6 +11,7 @@ import queue
 import struct
 import numpy as np
 from tqdm.auto import tqdm
+import utils.supervisedContrastiveLoss as contrastiveLossFunc
 
 # loss and metrics
 from sklearn.metrics import balanced_accuracy_score
@@ -85,7 +85,8 @@ class Client(Thread):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = contrastiveLossFunc.SupConLoss(temperature=0.08) #NewCode
+        # self.loss_fn = nn.CrossEntropyLoss()
         #self.loss_fn = FocalLoss()
         
        
@@ -181,6 +182,11 @@ class Client(Thread):
         # self.loss=self.loss_fn(self.outputs, self.targets.view(-1).long()) # for CE loss
         #print("calculate loss output", self.outputs.shape)
         #print("calculate target", self.targets.shape)
+        bsz = self.targets.shape[0] // 2
+        print(self.targets.shape, self.outputs.shape)
+        f1, f2 = torch.split(self.outputs, [bsz, bsz], dim=0)
+        self.outputs = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+
         self.loss = self.loss_fn(self.outputs, self.targets.long())
 
         if mode=='train':
@@ -259,7 +265,8 @@ class Client(Thread):
         
     def forward_back_personalise(self):
         batch_data = next(self.iterator)
-        self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        # self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        self.data, self.targets, self.key = torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'] #NewCode
         valid_keys = [key for key in self.key if key in self.activation_mappings]
         activations_list = [self.activation_mappings[key] for key in valid_keys]
         activations_array = np.array(activations_list)
@@ -270,7 +277,8 @@ class Client(Thread):
         
     def forward_back_personalise_test(self):
         batch_data = next(self.test_iterator)
-        self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        # self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        self.data, self.targets, self.key = torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'] #NewCode
         valid_keys = [key for key in self.key if key in self.activation_mappings]
         activations_list = [self.activation_mappings[key] for key in valid_keys]
         activations_array = np.array(activations_list)
@@ -284,7 +292,8 @@ class Client(Thread):
 
     def forward_front(self):
         batch_data = next(self.iterator)
-        self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id'].to(self.device)
+        # self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id'].to(self.device)
+        self.data, self.targets, self.key = torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'].to(self.device) #NewCode
         #print(self.key)
         
         # self.front_model.to(self.device)
@@ -296,7 +305,8 @@ class Client(Thread):
     def forward_front_key_value(self):
         batch_data = next(self.iterator)
         #self.data, self.targets = batch_data['image'].to(self.device), batch_data['label'].to(self.device)
-        self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        # self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        self.data, self.targets, self.key = torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'] #NewCode
         #print("Label", self.targets)
         #print("keys",self.key)
         # self.front_model.to(self.device)
@@ -311,7 +321,8 @@ class Client(Thread):
         #print("forward method")
         #print("self.kv_flag",self.kv_test_flag)
         batch_data = next(self.test_iterator)
-        self.data, self.targets , self.test_key= batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        # self.data, self.targets , self.test_key= batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
+        self.data, self.targets , self.test_key= torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'] #NewCode
         #print("target", self.targets)
         #print("keys",self.test_key)
         # self.front_model.to(self.device)

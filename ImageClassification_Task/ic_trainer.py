@@ -48,7 +48,8 @@ from utils.random_clients_generator import generate_random_clients
 from utils.connections import send_object
 from utils.argparser import parse_arguments
 from utils.merge import merge_weights
-from ImageClassification_Task.cifarbuilder import CIFAR10DataBuilder
+# from ImageClassification_Task.cifarbuilder import CIFAR10DataBuilder
+from ImageClassification_Task.contrastivecifarbuilder import ContrastiveCIFAR10DataBuilder
 from ImageClassification_Task.ic_client import Client
 from ImageClassification_Task.ic_server import ConnectedClient
 
@@ -894,9 +895,19 @@ class ICTrainer:
 
         for epoch in tqdm(range(self.args.epochs)):
             
-            if self.early_stop:
-                print(f"Early stopping at epoch {epoch}")
-                break
+            #NewCode
+            if self.early_stop or epoch > self.args.c_epoch:
+                # print(f"Early stopping at epoch {epoch}")
+                for client_id, client in self.clients.items():
+                    self.early_stop_counter = 0
+                    def new_forward(self, x):
+                        x = self.fl(x)
+                        x = self.fc(x)
+                        return x
+                    # Bind the new forward function to the each client instance
+                    bound_method = new_forward.__get__(client.back_model, client.back_model.__class__)
+                    setattr(client.back_model, 'forward', bound_method)
+                    print(client.back_model)
 
             wandb.log({'epoch':epoch})
 
@@ -993,7 +1004,7 @@ class ICTrainer:
         self.seed()
 
         #self.isic = ISICDataBuilder()
-        self.cifar_builder = CIFAR10DataBuilder()
+        self.cifar_builder = ContrastiveCIFAR10DataBuilder()
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")

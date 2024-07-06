@@ -171,5 +171,12 @@ def parse_arguments():
         help="To use contrastive models",
     )
 
+    parser.add_argument(
+        "--c_epoch",
+        type=int,
+        default=30,
+        help="Epoch at which contrastive loss training can begin",
+    )
+
     args = parser.parse_args()
     return args

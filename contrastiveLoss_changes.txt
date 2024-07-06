@@ -4,3 +4,4 @@ Any code being replaced is commented by "PreviousCode"
 Changes made in the repo till 2nd July 2024
 1. Added supervisedContrastiveLoss.py for functions needed in Contrastive Loss
 2. Added new model "resnet18_split1_contrastive.py" for contrastive loss
+3. New argument created in argparser.py for contrastive loss

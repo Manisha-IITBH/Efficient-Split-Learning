@@ -1,5 +1,7 @@
 from torchvision import models
 import torch.nn as nn
+import torch
+import torch.nn.functional as F
 
 """
 PARAMETER COUNTS
@@ -61,6 +63,11 @@ class center_back(nn.Module):
         self.l3 = m.layer3
         self.l4 = m.layer4
         self.l5 = m.avgpool
+        self.head = nn.Sequential(
+                nn.Linear(512, 512),
+                nn.ReLU(inplace=True),
+                nn.Linear(512, 256)
+        )
 
     def freeze(self,epoch,pretrained):
         for p in self.parameters():
@@ -70,6 +77,9 @@ class center_back(nn.Module):
         x = self.l3(x)
         x = self.l4(x)
         x = self.l5(x)
+        feat = torch.flatten(x, start_dim=1)
+        feat = self.head(feat)
+        feat = F.normalize(feat, dim=1)
         return x
     
 
@@ -77,11 +87,11 @@ class back(nn.Module):
     def __init__(self,):
         super().__init__()
         self.fl = nn.Flatten()
-        self.fc = nn.Sequential(nn.Linear(512, 512),nn.ReLU(inplace=True),nn.Linear(512, 10))
+        self.fc = nn.Linear(512, 10)
         
     def forward(self, x):
-        x = self.fl(x)
-        x = self.fc(x)
+        # x = self.fl(x)
+        # x = self.fc(x)
         return x
     
 # Instantiate the model and print its architecture
