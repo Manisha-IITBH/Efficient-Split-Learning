@@ -182,12 +182,13 @@ class Client(Thread):
         # self.loss=self.loss_fn(self.outputs, self.targets.view(-1).long()) # for CE loss
         #print("calculate loss output", self.outputs.shape)
         #print("calculate target", self.targets.shape)
-        bsz = self.targets.shape[0] // 2
+        bsz = self.targets.shape[0]
         print(self.targets.shape, self.outputs.shape)
         f1, f2 = torch.split(self.outputs, [bsz, bsz], dim=0)
         self.outputs = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
 
-        self.loss = self.loss_fn(self.outputs, self.targets.long())
+        # self.loss = self.loss_fn(self.outputs, self.targets.long())
+        self.loss = self.loss_fn(self.outputs, self.targets) #NewCode
 
         if mode=='train':
             self.train_loss += self.loss.item()
