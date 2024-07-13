@@ -93,24 +93,34 @@ class ConnectedClient(object):
             #print("Size of middle_activations:", self.middle_activations.size())
             local_middle_activations=list(self.middle_activations.cpu().detach().numpy())
             #print("Length of batchkey",len(self.batchkeys))
-            for i in range(0, len(self.batchkeys)):
+            for i in range(0, len(self.batchkeys[0])):
                 #print(self.batchkeys[i])
-                self.activation_mappings[self.batchkeys[i]]=local_middle_activations[i]
+                self.activation_mappings[self.batchkeys[0][i]]=local_middle_activations[i] #NewCode
+                self.activation_mappings[self.batchkeys[1][i]]=local_middle_activations[i] #NewCode
             
         else:
             # Ensure all keys in batchkeys exist in activation_mappings
-            missing_keys = [key for key in self.batchkeys if key not in self.activation_mappings]
+            #NewCode
+            missing_keys = []
+            missing_keys.extend([key for key in self.batchkeys[0] if key not in self.activation_mappings])
+            missing_keys.extend([key for key in self.batchkeys[1] if key not in self.activation_mappings])
+
             if missing_keys:
                 print(f"Warning: Missing keys in activation_mappings: {missing_keys}")
 
             # Retrieve activations for batchkeys from activation_mappings
-            valid_keys = [key for key in self.batchkeys if key in self.activation_mappings]
+            # valid_keys = [key for key in self.batchkeys if key[0] in self.activation_mappings]
+            #NewCode
+            valid_keys = []
+            valid_keys.extend([key for key in self.batchkeys[0] if key in self.activation_mappings])
+            valid_keys.extend([key for key in self.batchkeys[1] if key in self.activation_mappings])
             if not valid_keys:
                 print("Error: No valid keys found in activation_mappings.")
                 return
 
             # Convert the list of numpy arrays to a single numpy array
-            activations_list = [self.activation_mappings[key] for key in valid_keys]
+            # activations_list = [self.activation_mappings[key[0]] for key in valid_keys]
+            activations_list = [self.activation_mappings[key] for key in valid_keys] #NewCode
             activations_array = np.array(activations_list)
             
             # Convert the numpy array to a tensor and move it to the appropriate device
@@ -125,18 +135,27 @@ class ConnectedClient(object):
             #print("Size of middle_activations:", self.middle_activations.size())
             local_middle_activations=list(self.middle_activations.cpu().detach().numpy())
             #print("Length of batchkey",len(self.test_batchkeys))
-            for i in range(0, len(self.test_batchkeys)):
+            for i in range(0, len(self.test_batchkeys[0])):
                 #print(self.test_batchkeys[i])
-                self.test_activation_mappings[self.test_batchkeys[i]]=local_middle_activations[i]
+                self.test_activation_mappings[self.test_batchkeys[0][i]]=local_middle_activations[i]
+                self.test_activation_mappings[self.test_batchkeys[1][i]]=local_middle_activations[i]
             
         else:
             # Ensure all keys in batchkeys exist in activation_mappings
-            missing_test_keys = [key for key in self.test_batchkeys if key not in self.test_activation_mappings]
+            # missing_test_keys = [key for key in self.test_batchkeys if key not in self.test_activation_mappings]
+            #NewCode
+            missing_test_keys = []
+            missing_test_keys.extend([key for key in self.test_batchkeys[0] if key not in self.test_activation_mappings])
+            missing_test_keys.extend([key for key in self.test_batchkeys[1] if key not in self.test_activation_mappings])
             if missing_test_keys:
                 print(f"Warning: Missing keys in activation_mappings: {missing_test_keys}")
 
             # Retrieve activations for batchkeys from activation_mappings
-            valid_test_keys = [key for key in self.test_batchkeys if key in self.test_activation_mappings]
+            # valid_test_keys = [key for key in self.test_batchkeys if key in self.test_activation_mappings]
+            #NewCode
+            valid_test_keys = []
+            valid_test_keys.extend([key for key in self.test_batchkeys[0] if key in self.test_activation_mappings])
+            valid_test_keys.extend([key for key in self.test_batchkeys[1] if key in self.test_activation_mappings])
             if not valid_test_keys:
                 print("Error: No valid keys found in activation_mappings.")
                 return

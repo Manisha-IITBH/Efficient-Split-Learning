@@ -469,41 +469,41 @@ class ICTrainer:
                     self.sc_clients[client_id].center_optimizer.step()
                     self.sc_clients[client_id].center_optimizer.zero_grad()
                     
-                    f1=client.calculate_train_metric()
-                    client.train_f1[-1] += f1 
+        #             f1=client.calculate_train_metric()
+        #             client.train_f1[-1] += f1 
                     
-                    #print("train f1 per iteration: ",iteration,f1)
-                    wandb.log({f'train f1 / iter: client {client_id}':f1.item()})
+        #             #print("train f1 per iteration: ",iteration,f1)
+        #             wandb.log({f'train f1 / iter: client {client_id}':f1.item()})
 
-        # calculate per epoch metrics
-        bal_accs, f1_macros = [], []
-        avg_loss = 0
-        for c_id, client in self.clients.items():
-            client.train_f1[-1] /= client.num_iterations
-            client.train_loss /= client.num_iterations
-            avg_loss += client.train_loss
-            self.overall_f1['train'][-1] += client.train_f1[-1]
-            bal_acc_client, f1_macro_client = client.get_main_metric(mode='train') 
-            bal_accs.append(bal_acc_client)
-            f1_macros.append(f1_macro_client)
-            wandb.log({f'train f1 {c_id}': client.train_f1[-1].item()})
-            wandb.log({f'train accuracy {c_id}':bal_acc_client})
-            wandb.log({f'tarin f1 macro {c_id}':f1_macro_client})
-            wandb.log({f'train loss {c_id}': client.train_loss})
-            client.train_loss = 0 # reset for next epoch
+        # # calculate per epoch metrics
+        # bal_accs, f1_macros = [], []
+        # avg_loss = 0
+        # for c_id, client in self.clients.items():
+        #     client.train_f1[-1] /= client.num_iterations
+        #     client.train_loss /= client.num_iterations
+        #     avg_loss += client.train_loss
+        #     self.overall_f1['train'][-1] += client.train_f1[-1]
+        #     bal_acc_client, f1_macro_client = client.get_main_metric(mode='train') 
+        #     bal_accs.append(bal_acc_client)
+        #     f1_macros.append(f1_macro_client)
+        #     wandb.log({f'train f1 {c_id}': client.train_f1[-1].item()})
+        #     wandb.log({f'train accuracy {c_id}':bal_acc_client})
+        #     wandb.log({f'tarin f1 macro {c_id}':f1_macro_client})
+        #     wandb.log({f'train loss {c_id}': client.train_loss})
+        #     client.train_loss = 0 # reset for next epoch
 
 
-        # calculate per epoch metrics across clients
-        bal_acc = np.array(bal_accs).mean()
-        self.overall_acc['train'][-1]=bal_acc
-        f1_macro = np.array(f1_macros).mean()
-        self.overall_f1['train'][-1] /= self.num_clients
-        print("avg train f1 all clients: ", self.overall_f1['train'][-1].item())
-        print("avg train accuracy all clients: ", self.overall_acc['train'][-1])
-        wandb.log({'avg train f1 all clients': self.overall_f1['train'][-1].item()})
-        wandb.log({'avg train bal acc all clients': bal_acc})
-        wandb.log({'avg train f1 macro all clients': f1_macro})
-        wandb.log({'avg train loss all clients': avg_loss / self.num_clients})
+        # # calculate per epoch metrics across clients
+        # bal_acc = np.array(bal_accs).mean()
+        # self.overall_acc['train'][-1]=bal_acc
+        # f1_macro = np.array(f1_macros).mean()
+        # self.overall_f1['train'][-1] /= self.num_clients
+        # print("avg train f1 all clients: ", self.overall_f1['train'][-1].item())
+        # print("avg train accuracy all clients: ", self.overall_acc['train'][-1])
+        # wandb.log({'avg train f1 all clients': self.overall_f1['train'][-1].item()})
+        # wandb.log({'avg train bal acc all clients': bal_acc})
+        # wandb.log({'avg train f1 macro all clients': f1_macro})
+        # wandb.log({'avg train loss all clients': avg_loss / self.num_clients})
         self.merge_model_weights(epoch)
         #if not self.pooling_mode:
             # merge model weights (center and back)
@@ -669,54 +669,54 @@ class ICTrainer:
                     client.forward_back()
                     client.calculate_loss(mode='test')
                     wandb.log({'Validation step loss': client.loss.item()})
-                    f1=client.calculate_test_metric()
-                    client.test_f1[-1] += f1 
-                    #print("validation f1 per iteration: ",iteration,f1)
-                    wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
+        #             f1=client.calculate_test_metric()
+        #             client.test_f1[-1] += f1 
+        #             #print("validation f1 per iteration: ",iteration,f1)
+        #             wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
                     
-        # calculate per epoch metrics
-        avg_loss = 0
-        bal_accs,f1_macros = [], []
-        for c_id, client in self.clients.items():
-            client.test_f1[-1] /= len(client.test_DataLoader)
-            client.test_loss /= len(client.test_DataLoader)
-            # calculate remaining metrics
-            avg_loss += client.test_loss
-            bal_acc_client, f1_macro_client = client.get_main_metric(mode='test')
-            bal_accs.append(bal_acc_client)
-            f1_macros.append(f1_macro_client)
-            self.overall_f1['test'][-1] += client.test_f1[-1]
-            wandb.log({f'Validation f1 {c_id}': client.test_f1[-1].item()})
-            wandb.log({f'Validation accuracy {c_id}':bal_acc_client})
-            wandb.log({f'Validation macro f1 {c_id}':f1_macro_client})
-            wandb.log({f'Validation loss {c_id}': client.test_loss})
-            client.test_loss = 0 # reset for next epoch
+        # # calculate per epoch metrics
+        # avg_loss = 0
+        # bal_accs,f1_macros = [], []
+        # for c_id, client in self.clients.items():
+        #     client.test_f1[-1] /= len(client.test_DataLoader)
+        #     client.test_loss /= len(client.test_DataLoader)
+        #     # calculate remaining metrics
+        #     avg_loss += client.test_loss
+        #     bal_acc_client, f1_macro_client = client.get_main_metric(mode='test')
+        #     bal_accs.append(bal_acc_client)
+        #     f1_macros.append(f1_macro_client)
+        #     self.overall_f1['test'][-1] += client.test_f1[-1]
+        #     wandb.log({f'Validation f1 {c_id}': client.test_f1[-1].item()})
+        #     wandb.log({f'Validation accuracy {c_id}':bal_acc_client})
+        #     wandb.log({f'Validation macro f1 {c_id}':f1_macro_client})
+        #     wandb.log({f'Validation loss {c_id}': client.test_loss})
+        #     client.test_loss = 0 # reset for next epoch
 
-        # calculate epoch metrics across clients
-        bal_acc = np.array(bal_accs).mean()
-        self.overall_acc['test'][-1]=bal_acc
-        f1_macro = np.array(f1_macros).mean()
-        self.overall_f1['test'][-1] /= self.num_clients
-        print("validation f1: ", self.overall_f1['test'][-1])
-        print("validation acc: ", self.overall_acc['test'][-1])
-        wandb.log({'Validation avg f1 all clients': self.overall_f1['test'][-1].item()})
-        wandb.log({'validation avg accuracy all clients': bal_acc})
-        wandb.log({'Validation avg f1 macro all clients': bal_acc})
-        wandb.log({'Validation avg loss all clients': avg_loss / self.num_clients}) 
-        if self.overall_acc['test'][-1] > self.best_acc:
-            print(self.best_acc)
-            self.best_acc = self.overall_acc['test'][-1]
-            self.best_epoch = epoch
-            self.early_stop_counter = 0
-            print(f"MAX Validation Accuracy Score: {self.best_acc} @ epoch {self.best_epoch}")
-            wandb.log({
-                'max validation accuracy score':self.best_acc,
-                'max_validation_accuarcy_epoch':self.best_epoch
-            })
-            return True
-        else:
-            self.early_stop_counter += 1
-            return False
+        # # calculate epoch metrics across clients
+        # bal_acc = np.array(bal_accs).mean()
+        # self.overall_acc['test'][-1]=bal_acc
+        # f1_macro = np.array(f1_macros).mean()
+        # self.overall_f1['test'][-1] /= self.num_clients
+        # print("validation f1: ", self.overall_f1['test'][-1])
+        # print("validation acc: ", self.overall_acc['test'][-1])
+        # wandb.log({'Validation avg f1 all clients': self.overall_f1['test'][-1].item()})
+        # wandb.log({'validation avg accuracy all clients': bal_acc})
+        # wandb.log({'Validation avg f1 macro all clients': bal_acc})
+        # wandb.log({'Validation avg loss all clients': avg_loss / self.num_clients}) 
+        # if self.overall_acc['test'][-1] > self.best_acc:
+        #     print(self.best_acc)
+        #     self.best_acc = self.overall_acc['test'][-1]
+        #     self.best_epoch = epoch
+        #     self.early_stop_counter = 0
+        #     print(f"MAX Validation Accuracy Score: {self.best_acc} @ epoch {self.best_epoch}")
+        #     wandb.log({
+        #         'max validation accuracy score':self.best_acc,
+        #         'max_validation_accuarcy_epoch':self.best_epoch
+        #     })
+        #     return True
+        # else:
+        #     self.early_stop_counter += 1
+        #     return False
                     
     def save_models(self,epoch):
         """
@@ -796,7 +796,7 @@ class ICTrainer:
             preds = []
 
             for batch in self.clients[c_id].main_test_DataLoader:
-                image, label = batch['image'].to(self.device), batch['label'].to(self.device)
+                image, label = torch.cat([batch['image'][0], batch['image'][1]], dim=0).to(self.device), batch['label'].to(self.device)
 
                 x1 = self.clients[c_id].front_model(image)
                 x2 = self.sc_clients[c_id].center_front_model(x1)
@@ -836,7 +836,7 @@ class ICTrainer:
     def save_kv(self,):
             for c_id in tqdm(self.client_ids,desc="Client Side KV for Training"):
                 for batch in self.clients[c_id].train_DataLoader:
-                    image, label, batchkeys = batch['image'].to(self.device), batch['label'].to(self.device), batch['id']
+                    image, label, batchkeys = torch.cat([batch['image'][0], batch['image'][1]], dim=0).to(self.device), batch['label'].to(self.device), batch['id']
                     #print(batchkeys)
                     #x1 = self.clients[c_id].front_model(image)
                     #x2 = self.sc_clients[c_id].center_front_model(x1)
@@ -849,14 +849,15 @@ class ICTrainer:
                     local_middle_activations=list(x3.cpu().detach().numpy())
                     for i in range(0, len(batchkeys)):
                         #print(batchkeys[i])
-                        self.clients[c_id].activation_mappings[batchkeys[i]]=local_middle_activations[i]
+                        self.clients[c_id].activation_mappings[batchkeys[i][0]]=local_middle_activations[i] #NewCode
+                        self.clients[c_id].activation_mappings[batchkeys[i][1]]=local_middle_activations[i] #NewCode
                 print(f"Training Set Key Value Store Created for Client {c_id}")
                 print("Training Set Key Value Store Length is :", len((list(self.clients[c_id].activation_mappings.keys()))))
                 
                 
             for c_id in tqdm(self.client_ids,desc="Client Side KV for Testing"):
                 for batch in self.clients[c_id].test_DataLoader:
-                    image, label, batchkeys = batch['image'].to(self.device), batch['label'].to(self.device), batch['id']
+                    image, label, batchkeys = torch.cat([batch['image'][0], batch['image'][1]], dim=0).to(self.device), batch['label'].to(self.device), batch['id']
                     #x1 = self.clients[c_id].front_model(image)
                     #x2 = self.sc_clients[c_id].center_front_model(x1)
                     valid_keys = [key for key in batchkeys if key in self.sc_clients[c_id].test_activation_mappings]
@@ -907,7 +908,7 @@ class ICTrainer:
                     # Bind the new forward function to the each client instance
                     bound_method = new_forward.__get__(client.back_model, client.back_model.__class__)
                     setattr(client.back_model, 'forward', bound_method)
-                    print(client.back_model)
+                    # print(client.back_model)
 
             wandb.log({'epoch':epoch})
 

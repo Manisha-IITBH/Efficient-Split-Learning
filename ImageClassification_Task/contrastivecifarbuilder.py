@@ -183,7 +183,7 @@ class ContrastiveCIFAR10Dataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         label = self.labels[idx]
-        unique_id = f"{self.client_id}-{self.dataset_type}-{idx}"  # Append dataset_type to the unique ID
+        unique_id = [f"{self.client_id}-{self.dataset_type}-{idx}-1", f"{self.client_id}-{self.dataset_type}-{idx}-2"]  # Append dataset_type to the unique ID
 
         # Convert NumPy array to PIL Image
         image = Image.fromarray(image)

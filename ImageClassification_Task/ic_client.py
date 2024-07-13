@@ -200,7 +200,7 @@ class Client(Thread):
         preds = self.outputs
         targets = self.targets
         #print("Calculate train metric")
-        #print("Shapes - preds:", preds.shape, "targets:", targets.shape)
+        print("Shapes - preds:", preds.shape, "targets:", targets.shape)
         self.train_preds.append(preds.cpu())
         self.train_targets.append(targets.cpu())
         f1 = self.run_metric(preds.cpu(),targets.cpu())
@@ -212,8 +212,8 @@ class Client(Thread):
         targets = self.targets
         self.test_preds.append(preds.cpu())
         self.test_targets.append(targets.cpu())
-        f1 = self.run_metric(preds.cpu(),targets.cpu())
-        return f1
+        # f1 = self.run_metric(preds.cpu(),targets.cpu())
+        # return f1
     
     
     
