@@ -183,7 +183,6 @@ class Client(Thread):
         #print("calculate loss output", self.outputs.shape)
         #print("calculate target", self.targets.shape)
         bsz = self.targets.shape[0]
-        print(self.targets.shape, self.outputs.shape)
         f1, f2 = torch.split(self.outputs, [bsz, bsz], dim=0)
         self.outputs = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
 
@@ -268,7 +267,10 @@ class Client(Thread):
         batch_data = next(self.iterator)
         # self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
         self.data, self.targets, self.key = torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'] #NewCode
-        valid_keys = [key for key in self.key if key in self.activation_mappings]
+        # valid_keys = [key for key in self.key if key in self.activation_mappings]
+        valid_keys = []
+        valid_keys.extend([key for key in self.key[0] if key in self.activation_mappings])
+        valid_keys.extend([key for key in self.key[1] if key in self.activation_mappings])
         activations_list = [self.activation_mappings[key] for key in valid_keys]
         activations_array = np.array(activations_list)
         x2 = torch.tensor(activations_array, device=self.device)
@@ -280,7 +282,10 @@ class Client(Thread):
         batch_data = next(self.test_iterator)
         # self.data, self.targets, self.key = batch_data['image'].to(self.device), batch_data['label'].to(self.device), batch_data['id']
         self.data, self.targets, self.key = torch.cat([batch_data['image'][0], batch_data['image'][1]], dim=0).to(self.device), batch_data['label'].to(self.device), batch_data['id'] #NewCode
-        valid_keys = [key for key in self.key if key in self.activation_mappings]
+        # valid_keys = [key for key in self.key if key in self.activation_mappings]
+        valid_keys = []
+        valid_keys.extend([key for key in self.key[0] if key in self.activation_mappings])
+        valid_keys.extend([key for key in self.key[1] if key in self.activation_mappings])
         activations_list = [self.activation_mappings[key] for key in valid_keys]
         activations_array = np.array(activations_list)
         x2 = torch.tensor(activations_array, device=self.device)
