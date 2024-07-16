@@ -23,6 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.special import rel_entr
 from scipy.interpolate import make_interp_spline
 from tqdm.auto import tqdm
 import wandb
@@ -87,13 +88,39 @@ class ICTrainer:
             self.clients['pooled_client'] = self.clients.pop(key) 
         self.client_ids = list(self.clients.keys())
         
+        self.val_pairs=dict()
+        for i in range(len(self.client_ids)):
+                self.val_pairs[self.client_ids[i]]= self.client_ids[(i+1)%len(self.client_ids)]
+        print(f"VAL PAIRS - {self.val_pairs}")
+        self.test_pairs=dict()
+        for i in range(len(self.client_ids)):
+                self.test_pairs[self.client_ids[i]]= self.client_ids[(i+2)%len(self.client_ids)]
+        print(f"TEST PAIRS - {self.test_pairs}")
+        
         self.clients_threshold = dict()
         for c_id, _ in self.clients.items():
             self.clients_threshold[c_id]=0
         
+        self.ood_splits=dict()
+        p=int(2000/len(self.clients))
+        for i in range(len(self.clients.items())):
+            if i<len(self.clients)-1:
+                self.ood_splits[i]=[i*p,(i+1)*p]
+            else:
+                self.ood_splits[i]=[i*p,-1]
+        
+        clients_train_dist_prob=dict()
+        clients_test_dist_prob=dict()
+        clients_maintest_dist_prob=dict()
+        
+        for c_id in self.client_ids:
+            clients_train_dist_prob[c_id]=[]
+            clients_test_dist_prob[c_id]=[]
+            clients_maintest_dist_prob[c_id]=[]
+        
         data = []
         for idx, (c_id, client) in enumerate(self.clients.items()):
-            train_ds, test_ds, main_test_ds = self.cifar_builder.get_datasets(client_id=idx, pool=self.pooling_mode)
+            train_ds, test_ds, main_test_ds = self.cifar_builder.get_datasets(client_id=idx, pool=self.pooling_mode, splits=self.ood_splits)
             client.train_dataset = train_ds
             client.test_dataset = test_ds
             client.main_test_dataset = main_test_ds
@@ -104,8 +131,11 @@ class ICTrainer:
             )
             try:
                 train_class_counts = Counter(item['label'].item() for item in train_ds)
+                print(f'train class counts: {train_class_counts}')
                 test_class_counts = Counter(item['label'].item() for item in test_ds)
+                print(f'test class counts: {test_class_counts}')
                 main_test_class_counts = Counter(item['label'].item() for item in main_test_ds)
+                print(f'main test class counts: {main_test_class_counts}')
             except KeyError as e:
                 print(f"KeyError: {e} not found in dataset items. Inspecting item structure for alternative keys or attributes...")
                 raise
@@ -123,7 +153,23 @@ class ICTrainer:
             print(f"  Train: {train_class_proportions}")
             print(f"  Test: {test_class_proportions}")
             print(f"  Main Test: {main_test_class_proportions}")
-
+            
+            for id in range(10):                
+                if id in train_class_proportions.keys():
+                    clients_train_dist_prob[c_id].append(train_class_proportions[id])
+                else:
+                    clients_train_dist_prob[c_id].append(0)
+                    
+                if id in test_class_proportions.keys():
+                    clients_test_dist_prob[c_id].append(test_class_proportions[id])
+                else:
+                    clients_test_dist_prob[c_id].append(0)
+                    
+                if id in main_test_class_proportions.keys():
+                    clients_maintest_dist_prob[c_id].append(main_test_class_proportions[id])
+                else:
+                    clients_maintest_dist_prob[c_id].append(0)
+                    
             # Collect data for plotting
             for class_label, freq in train_class_counts.items():
                 data.append({'client': c_id, 'class': class_label, 'frequency': freq, 'dataset': 'train'})
@@ -136,6 +182,19 @@ class ICTrainer:
             print(f"  Train: {train_class_counts}")
             #print(f"  Test: {test_class_counts}")
             #print(f"  Main Test: {main_test_class_counts}")
+        
+        print("clients train dist probabilities",clients_train_dist_prob)
+        print("clients test dist probabilities",clients_test_dist_prob)
+        print("clients main test dist probabilities",clients_maintest_dist_prob)
+        
+        kl_divergences=dict()
+        for c_id in self.client_ids:
+            kl_divergences[c_id]=dict()
+        
+        for c_id in self.client_ids:
+            kl_divergences[c_id]['train-val']=[np.sum(rel_entr([i+1e-10 for i in clients_train_dist_prob[c_id]], [i+1e-10 for i in clients_test_dist_prob[self.val_pairs[c_id]]])), np.sum(rel_entr([i+1e-10 for i in clients_test_dist_prob[self.val_pairs[c_id]]], [i+1e-10 for i in clients_train_dist_prob[c_id]]))]
+            kl_divergences[c_id]['train-test']=[np.sum(rel_entr([i+1e-10 for i in clients_train_dist_prob[c_id]], [i+1e-10 for i in clients_maintest_dist_prob[self.test_pairs[c_id]]])), np.sum(rel_entr([i+1e-10 for i in clients_maintest_dist_prob[self.test_pairs[c_id]]], [i+1e-10 for i in clients_train_dist_prob[c_id]]))]
+        print("kl_divergences:",kl_divergences)
         print(f'generated {self.num_clients} clients with data')
         
         # Convert data to DataFrame
@@ -404,12 +463,17 @@ class ICTrainer:
                 self.sc_clients[c_id].kv_flag=0
         else:
             # create iterators for initial forward pass of testing phase
-            for c_id, client in self.clients.items():
-                client.kv_test_flag=1
+            # for c_id, client in self.clients.items():
+            #     client.kv_test_flag=1
+            #     self.sc_clients[c_id].kv_test_flag=1
+            #     client.num_test_iterations = len(client.test_DataLoader)
+            #     client.test_iterator = iter(client.test_DataLoader)
+            for c_id in self.client_ids:
+                self.clients[c_id].kv_test_flag=1
                 self.sc_clients[c_id].kv_test_flag=1
-                client.num_test_iterations = len(client.test_DataLoader)
-                client.test_iterator = iter(client.test_DataLoader)
-                
+                self.clients[c_id].num_test_iterations = len(self.clients[self.val_pairs[c_id]].test_DataLoader)
+                self.clients[c_id].test_iterator = iter(self.clients[self.val_pairs[c_id]].test_DataLoader)
+            
             # forward client-side front model which sets activation and target mappings.
             for c_id, client in tqdm(self.clients.items()):
                 #print(c_id,client.num_test_iterations)
@@ -646,19 +710,31 @@ class ICTrainer:
             client.pred = []
             client.y = []
 
-        for client_id, client in tqdm(self.clients.items()):
-                client.num_test_iterations = len(client.test_DataLoader)
-                client.test_iterator = iter(client.test_DataLoader)
-                for iteration in tqdm(range(client.num_test_iterations),desc="Personalised Validation"):
-                    client.forward_back_personalise_test()
-                    #client.forward_front_key_value_test()
-                    client.calculate_loss(mode='test')
-                    wandb.log({'Validation step loss': client.loss.item()})
-                    f1=client.calculate_test_metric()
-                    client.test_f1[-1] += f1 
-                    #print("validation f1 per iteration: ",iteration,f1)
-                    wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
-                    
+        # for client_id, client in tqdm(self.clients.items()):
+        #         client.num_test_iterations = len(client.test_DataLoader)
+        #         client.test_iterator = iter(client.test_DataLoader)
+        #         for iteration in tqdm(range(client.num_test_iterations),desc="Personalised Validation"):
+        #             client.forward_back_personalise_test()
+        #             #client.forward_front_key_value_test()
+        #             client.calculate_loss(mode='test')
+        #             wandb.log({'Validation step loss': client.loss.item()})
+        #             f1=client.calculate_test_metric()
+        #             client.test_f1[-1] += f1 
+        #             #print("validation f1 per iteration: ",iteration,f1)
+        #             wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
+        for client_id in self.client_ids:
+            self.clients[client_id].num_test_iterations = len(self.clients[self.val_pairs[client_id]].test_DataLoader)
+            self.clients[client_id].test_iterator = iter(self.clients[self.val_pairs[client_id]].test_DataLoader)
+            for iteration in tqdm(range(self.clients[client_id].num_test_iterations),desc="Personalised Validation"):
+                self.clients[client_id].forward_back_personalise_test()
+                #client.forward_front_key_value_test()
+                self.clients[client_id].calculate_loss(mode='test')
+                wandb.log({'Validation step loss': self.clients[client_id].loss.item()})
+                f1=self.clients[client_id].calculate_test_metric()
+                self.clients[client_id].test_f1[-1] += f1 
+                #print("validation f1 per iteration: ",iteration,f1)
+                wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
+                
         # calculate per epoch metrics
         avg_loss = 0
         bal_accs,f1_macros = [], []
@@ -710,19 +786,31 @@ class ICTrainer:
         #    client.pred = []
         #    client.y = []
 
-        for client_id, client in tqdm(self.clients.items()):
-                client.num_test_iterations = len(client.test_DataLoader)
-                client.test_iterator = iter(client.test_DataLoader)
-                for iteration in tqdm(range(client.num_test_iterations),desc="Validation"):
-                    client.forward_front_key_value_test()
-                    self.sc_clients[client_id].test_batchkeys = client.test_key
-                    self.sc_clients[client_id].forward_center_front_test()
-                    # added by acs
-                    self.sc_clients[client_id].forward_discriminator_test()
-                    self.sc_clients[client_id].calculate_discriminator_loss(mode="test")
+        # for client_id, client in tqdm(self.clients.items()):
+        #         client.num_test_iterations = len(client.test_DataLoader)
+        #         client.test_iterator = iter(client.test_DataLoader)
+        #         for iteration in tqdm(range(client.num_test_iterations),desc="Validation"):
+        #             client.forward_front_key_value_test()
+        #             self.sc_clients[client_id].test_batchkeys = client.test_key
+        #             self.sc_clients[client_id].forward_center_front_test()
+        #             # added by acs
+        #             self.sc_clients[client_id].forward_discriminator_test()
+        #             self.sc_clients[client_id].calculate_discriminator_loss(mode="test")
                     
-                    wandb.log({'discriminator Validation step loss': self.sc_clients[client_id].disc_loss.item()})
-                    
+        #             wandb.log({'discriminator Validation step loss': self.sc_clients[client_id].disc_loss.item()})
+        for client_id in self.client_ids:
+            self.clients[client_id].num_test_iterations = len(self.clients[self.val_pairs[client_id]].test_DataLoader)
+            self.clients[client_id].test_iterator = iter(self.clients[self.val_pairs[client_id]].test_DataLoader)
+            for iteration in tqdm(range(self.clients[client_id].num_test_iterations),desc="Validation"):
+                self.clients[client_id].forward_front_key_value_test()
+                self.sc_clients[client_id].test_batchkeys = self.clients[client_id].test_key
+                self.sc_clients[client_id].forward_center_front_test()
+                # added by acs
+                self.sc_clients[client_id].forward_discriminator_test()
+                self.sc_clients[client_id].calculate_discriminator_loss(mode="test")
+                
+                wandb.log({'discriminator Validation step loss': self.sc_clients[client_id].disc_loss.item()})
+                  
                     #self.sc_clients[client_id].forward_center_back()
                     #client.remote_activations2 = self.sc_clients[client_id].remote_activations2
                     #client.forward_back()
@@ -805,22 +893,39 @@ class ICTrainer:
             client.pred = []
             client.y = []
 
-        for client_id, client in tqdm(self.clients.items()):
-                client.num_test_iterations = len(client.test_DataLoader)
-                client.test_iterator = iter(client.test_DataLoader)
-                for iteration in tqdm(range(client.num_test_iterations),desc="Validation"):
-                    client.forward_front_key_value_test()
-                    self.sc_clients[client_id].test_batchkeys = client.test_key
-                    self.sc_clients[client_id].forward_center_front_test()
-                    self.sc_clients[client_id].forward_center_back()
-                    client.remote_activations2 = self.sc_clients[client_id].remote_activations2
-                    client.forward_back()
-                    client.calculate_loss(mode='test')
-                    wandb.log({'Validation step loss': client.loss.item()})
-                    f1=client.calculate_test_metric()
-                    client.test_f1[-1] += f1 
-                    #print("validation f1 per iteration: ",iteration,f1)
-                    wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
+        # for client_id, client in tqdm(self.clients.items()):
+            
+        #         client.num_test_iterations = len(client.test_DataLoader)
+        #         client.test_iterator = iter(client.test_DataLoader)
+        #         for iteration in tqdm(range(client.num_test_iterations),desc="Validation"):
+        #             client.forward_front_key_value_test()
+        #             self.sc_clients[client_id].test_batchkeys = client.test_key
+        #             self.sc_clients[client_id].forward_center_front_test()
+        #             self.sc_clients[client_id].forward_center_back()
+        #             client.remote_activations2 = self.sc_clients[client_id].remote_activations2
+        #             client.forward_back()
+        #             client.calculate_loss(mode='test')
+        #             wandb.log({'Validation step loss': client.loss.item()})
+        #             f1=client.calculate_test_metric()
+        #             client.test_f1[-1] += f1 
+        #             #print("validation f1 per iteration: ",iteration,f1)
+        #             wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
+        for client_id in self.client_ids:
+            self.clients[client_id].num_test_iterations = len(self.clients[self.val_pairs[client_id]].test_DataLoader)
+            self.clients[client_id].test_iterator = iter(self.clients[self.val_pairs[client_id]].test_DataLoader)
+            for iteration in tqdm(range(self.clients[client_id].num_test_iterations),desc="Validation"):
+                self.clients[client_id].forward_front_key_value_test()
+                self.sc_clients[client_id].test_batchkeys = self.clients[client_id].test_key
+                self.sc_clients[client_id].forward_center_front_test()
+                self.sc_clients[client_id].forward_center_back()
+                self.clients[client_id].remote_activations2 = self.sc_clients[client_id].remote_activations2
+                self.clients[client_id].forward_back()
+                self.clients[client_id].calculate_loss(mode='test')
+                wandb.log({'Validation step loss': client.loss.item()})
+                f1=self.clients[client_id].calculate_test_metric()
+                self.clients[client_id].test_f1[-1] += f1 
+                #print("validation f1 per iteration: ",iteration,f1)
+                wandb.log({f'Validation f1 / iter: client {client_id}':f1.item()})
                     
         # calculate per epoch metrics
         avg_loss = 0
@@ -892,7 +997,7 @@ class ICTrainer:
                 torch.save(self.clients[c_id].back_model, self.save_dir / f'client_{c_id}_{self.args.model}_back_model.pth')
         else:
             for c_id in self.client_ids:
-                print("Save Best Model for Personlalisation Phase")
+                print("Save Best Model for Personalization Phase")
                 # client-side back model
                 back_state_dict = self.clients[c_id].back_model.state_dict()
                 torch.save(back_state_dict, self.save_dir / f'client_{c_id}_{self.args.model}_back_per.pth')
@@ -951,6 +1056,7 @@ class ICTrainer:
         # self.load_best_models()
         avg_acc=0
         for c_id in tqdm(self.client_ids,desc="Testing"):
+            
             # front = torch.load(self.save_dir / f'client_{c_id}_{self.args.model}_front_model.pth').to(self.device)
             # front.eval()
             # center_front = torch.load(self.save_dir / f'client_{c_id}_{self.args.model}_center_front_model.pth').to(self.device)
@@ -964,12 +1070,13 @@ class ICTrainer:
             #     print("Load Best Model for Personalisation Phase")
             #     back = torch.load(self.save_dir / f'client_{c_id}_{self.args.model}_back_per_model.pth').to(self.device)
             # back.eval()
+            
             trues = []
             preds = []
 
-            for batch in self.clients[c_id].main_test_DataLoader:
+            for batch in self.clients[self.test_pairs[c_id]].main_test_DataLoader:
                 image, label = batch['image'].to(self.device), batch['label'].to(self.device)
-
+                
                 x1 = self.clients[c_id].front_model(image)
                 x2 = self.sc_clients[c_id].center_front_model(x1)
                 x3 = self.sc_clients[c_id].center_back_model(x2)
@@ -1013,7 +1120,8 @@ class ICTrainer:
         # for c_id in tqdm(self.client_ids,desc="Testing_New"):
         
         # self.load_best_models()
-        for idx, (c_id, client) in enumerate(self.clients.items()):
+        for c_id in tqdm(self.client_ids,desc="Hybrid Testing"):
+        # for idx, (c_id, client) in enumerate(self.clients.items()):
             trues=[]
             preds=[]
             generalized=[]
@@ -1021,7 +1129,7 @@ class ICTrainer:
             c=0
             c1=0
             c2=0
-            for data in client.main_test_dataset:
+            for data in self.clients[self.test_pairs[c_id]].main_test_dataset:
                 c+=1
                 self.sc_clients[c_id].discriminator.eval()
                 image = data['image'].to(self.device)
@@ -1085,6 +1193,7 @@ class ICTrainer:
             })
             
             avg_acc+=accuracy
+            print(f'inference score {c_id}:', accuracy)
             wandb.log({f'inference score {c_id}': accuracy})
         print(f'Average inference score: {avg_acc/len(self.clients)}')
     
@@ -1114,7 +1223,7 @@ class ICTrainer:
                 
                 
             for c_id in tqdm(self.client_ids,desc="Client Side KV for Testing"):
-                for batch in self.clients[c_id].test_DataLoader:
+                for batch in self.clients[self.val_pairs[c_id]].test_DataLoader:
                     image, label, batchkeys = batch['image'].to(self.device), batch['label'].to(self.device), batch['id']
                     #x1 = self.clients[c_id].front_model(image)
                     #x2 = self.sc_clients[c_id].center_front_model(x1)

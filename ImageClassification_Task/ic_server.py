@@ -162,7 +162,7 @@ class ConnectedClient(object):
             # Ensure all keys in batchkeys exist in activation_mappings
             missing_test_keys = [key for key in self.test_batchkeys if key not in self.test_activation_mappings]
             if missing_test_keys:
-                print(f"Warning: Missing keys in activation_mappings: {missing_test_keys}")
+                print(f"Warning: Missing keys in test activation_mappings: {missing_test_keys}")
 
             # Retrieve activations for batchkeys from activation_mappings
             valid_test_keys = [key for key in self.test_batchkeys if key in self.test_activation_mappings]
